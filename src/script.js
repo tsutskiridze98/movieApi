@@ -6,6 +6,10 @@ const movieContainer = document.querySelector(".movie-container");
 const countries = document.querySelector(".countries");
 const movieCard = document.querySelector(".movie-card");
 
+const forSearch1 = document.querySelector(".for-search1");
+const warningDiv1 = document.querySelector(".warning-div1");
+const warningDiv2 = document.querySelector(".warning-div2");
+
 const movieNameClass = document.querySelector(".movie-name");
 const dateClass = document.querySelector(".date");
 const actorsClass = document.querySelector(".actors");
@@ -80,11 +84,18 @@ function getMovieData(movie) {
 };
 
 btn.addEventListener("click", function() {
-    const movieName = input.value;
-    getMovieData(movieName);
+    if(input.value !== "") {
+        warningDiv1.innerHTML = "";
+        warningDiv2.innerHTML = "";
+        const movieName = input.value;
+        getMovieData(movieName);
 
-    input.value = "";
-    countries.innerHTML = "";
+        input.value = "";
+        countries.innerHTML = "";
+    } else {
+        warningDiv1.innerHTML = `<p class="warning">Please write a movie name inside an input to search a movie</p>`;
+    }
+    
 });
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,7 +103,7 @@ btn.addEventListener("click", function() {
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Selectors 
-
+const container3Movies = document.querySelector(".movie-container-3movie");
 const inputs = document.querySelectorAll(".input-movie");
 const btn3Movies = document.querySelector(".btn-3-movie");
 
@@ -130,10 +141,11 @@ function get3Movies(movie) {
         //console.log(aa);
         for(let i = 0; i < aa.length; i++) {
            const a = await aa[i].json();
-           console.log(a);
+           //console.log(a);
             renderPopulation(a);
+            container3Movies.style.display = "flex";
         }
-      })
+    })
     .catch(err => {
         renderError(`Something went wrong for 1 ${err.message}. Try again!`);
     })
@@ -141,8 +153,16 @@ function get3Movies(movie) {
 
 
 btn3Movies.addEventListener("click", function() {
-    inputs.forEach(el => get3Movies(el.value));
+    if(inputs[0].value !== "" && inputs[1].value !== "" && inputs[2].value !== "") {
+        warningDiv1.innerHTML = "";
+        warningDiv2.innerHTML = "";
+        inputs.forEach(el => get3Movies(el.value));
 
-    movieLengthSum = 0;
-    populationSum = 0;
+        inputs.forEach(el => el.value = "");
+        movieLengthSum = 0;
+        populationSum = 0;
+    } else {
+        warningDiv2.innerHTML = `<p class="warning">Please fill all the inputs to approve your search!</p>`;
+    }
+    
 });
