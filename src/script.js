@@ -1,6 +1,6 @@
-'use strict';
+import { getMovieDataAPI, getCountryDataAPI } from "./data.js";
 
-const btn = document.querySelector('.btn');
+const btn = document.querySelector(".btn");
 const input = document.querySelector(".input");
 const movieContainer = document.querySelector(".movie-container");
 const countries = document.querySelector(".countries");
@@ -15,94 +15,77 @@ const dateClass = document.querySelector(".date");
 const actorsClass = document.querySelector(".actors");
 
 function renderError(message) {
-    movieCard.insertAdjacentText('beforeend', message);
+	movieCard.insertAdjacentText("beforeend", message);
 }
 
 function renderCountry(data) {
-
-    const html = `
-    <div class="country-inf">
-        <img src="${data[0].flag}"/>
-        <h3 class="country-name">${data[0].name}</h3>
-        <p class="country-currency">${data[0].currencies[0].name}</p>
-    </div>
+	const html = `
+	<div class="country-inf">
+		<img src="${data.flag}"/>
+		<h3 class="country-name">${data.name}</h3>
+		<p class="country-currency">${data.currency}</p>
+	</div>
     `;
 
-    countries.insertAdjacentHTML("beforeend", html);
-
+	countries.insertAdjacentHTML("beforeend", html);
 }
 
-function renderMovie(data) {
-    const actorsFullNames = data.Actors.split(" ");
-    //console.log(actorsFullNames);
-    const actorsNamesArr = [];
-    actorsFullNames.forEach((el, i) => {
-        if(i % 2 === 0) {
-            actorsNamesArr.push(el);
-        }
-    })
+async function getMovieData(movie) {
+	const movieData = await getMovieDataAPI(movie).then((data) => ({
+		name: data.Title,
+		actors: data.Actors.split(" "),
+		country: data.Country.split(", "),
+		releasedYear: data.Year,
+	}));
 
-    const actorsNames = actorsNamesArr.join(", ")
+	const countryData = await Promise.all(
+		movieData.country.map((countryName) => getCountryDataAPI(countryName)),
+	).then((countryData) =>
+		countryData.map((d) => ({
+			name: d[0].name,
+			flag: d[0].flags.png,
+			currency: d[0].currencies[0].name,
+		})),
+	).catch((err) => {
+		renderError(`Something went wrong for 1 ${err.message}. Try again!`);
+	});
 
-    //console.log(actorsNames);
-    movieContainer.style.display= "flex";
+	movieContainer.style.display = "flex";
+	const actorsNamesArr = [];
+	movieData.actors.forEach((el, i) => {
+		if (i % 2 === 0) {
+			actorsNamesArr.push(el);
+		}
+	});
+	const actorsNames = actorsNamesArr.join(", ");
 
-    movieNameClass.textContent = data.Title;
-    dateClass.textContent = `The movie was realised ${new Date().getFullYear() - +data.Year} years ago`;
-    actorsClass.textContent = `Actors: ${actorsNames}`;
+	console.log(movieData);
+	movieNameClass.textContent = movieData.name;
+	actorsClass.textContent = `Actors: ${actorsNames}`;
+	dateClass.textContent = `The movie was realised ${new Date().getFullYear() - +movieData.releasedYear} years ago`;
+	countryData.forEach(el => {
+		renderCountry(el);
+	});
 }
 
+btn.addEventListener("click", function () {
+	if (input.value !== "") {
+		warningDiv1.innerHTML = "";
+		warningDiv2.innerHTML = "";
+		const movieName = input.value;
+		getMovieData(movieName);
 
-function getMovieData(movie) {
-    // Country 1
-    fetch(`http://www.omdbapi.com/?i=tt3896198&apikey=1b7a4e59&t=${movie}`)
-    .then(response => response.json())
-    .then(data => {
-        //console.log(data);
-        renderMovie(data);
-        const countries = data.Country.split(", ");
-        console.log(countries);
-        const promises = [];
-        for(let i = 0; i < countries.length; i++) {
-            promises.push(fetch(`https://restcountries.com/v2/name/${countries[i]}`));
-        }
-        //console.log(promises);
-        return Promise.all(promises)
-    })
-    .then(async(aa) => {
-        //console.log(aa);
-        for(let i = 0; i < aa.length; i++) {
-           const a = await aa[i].json();
-           //console.log(a);
-            //console.log(a[0].name);
-            renderCountry(a);
-        }
-      })
-    .catch(err => {
-        renderError(`Something went wrong for 1 ${err.message}. Try again!`);
-    })
-};
-
-btn.addEventListener("click", function() {
-    if(input.value !== "") {
-        warningDiv1.innerHTML = "";
-        warningDiv2.innerHTML = "";
-        const movieName = input.value;
-        getMovieData(movieName);
-
-        input.value = "";
-        countries.innerHTML = "";
-    } else {
-        warningDiv1.innerHTML = `<p class="warning">Please write a movie name inside an input to search a movie</p>`;
-    }
-    
+		input.value = "";
+		countries.innerHTML = "";
+	} else {
+		warningDiv1.innerHTML = `<p class="warning">Please write a movie name inside an input to search a movie</p>`;
+	}
 });
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////// 3 movies Search Functionality /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Selectors 
+// Selectors
 const container3Movies = document.querySelector(".movie-container-3movie");
 const inputs = document.querySelectorAll(".input-movie");
 const btn3Movies = document.querySelector(".btn-3-movie");
@@ -110,59 +93,52 @@ const btn3Movies = document.querySelector(".btn-3-movie");
 const lengthId = document.querySelector("#length");
 const populationId = document.querySelector("#population");
 
-let movieLengthSum = 0;
-let populationSum = 0;
+async function get4Movies(movies) {
+	let moviesData = await Promise.all(
+		movies.map((movieName) => getMovieDataAPI(movieName)),
+	).then((movies) =>
+		movies.map((d) => ({ runtime: parseInt(d.Runtime), countries: d.Country.split(", ") })),
+	);
+	const totalRuntime = moviesData.reduce((a, c) => a + c.runtime, 0);
 
-function renderPopulation(data) {
-    const pop = data[0].population;
-    populationSum += pop;
-    populationId.textContent = `Sum of population of all the countries in which the movies where made: ${(populationSum / 1000000).toFixed(1)} million`;
+	const countriesArr = [];
+	moviesData.forEach((el) => {
+		el.countries.forEach(co => countriesArr.push(co));
+	});
+
+	const countriesSet = new Set(countriesArr);
+	const countriesArray = Array.from(countriesSet);
+
+	const countryData = await Promise.all(
+		countriesArray.map((countryName) => getCountryDataAPI(countryName))
+	).then((country) => country.map((d) => ({population: d[0].population})));
+
+	const totalPopulation = countryData.reduce((a, c) => a + c.population, 0);
+	container3Movies.style.display = "flex";
+
+	lengthId.textContent = `The length of all the movies combined in minutes: ${totalRuntime} minutes`;
+
+
+	populationId.textContent = `Sum of population of all the countries in which the movies where made: ${(
+		totalPopulation / 1000000
+	).toFixed(1)} million`;
 }
 
+btn3Movies.addEventListener("click", function () {
+	if (
+		inputs[0].value !== "" &&
+		inputs[1].value !== "" &&
+		inputs[2].value !== ""
+	) {
+		warningDiv1.innerHTML = "";
+		warningDiv2.innerHTML = "";
 
-function get3Movies(movie) {
-    fetch(`http://www.omdbapi.com/?i=tt3896198&apikey=1b7a4e59&t=${movie}`)
-    .then(response => response.json())
-    .then(data => {
-        const movieLength = data.Runtime.split(" ");
-        movieLengthSum += +movieLength[0];
-        lengthId.textContent = `The length of all the movies combined in minutes: ${movieLengthSum} minutes`;
+		let inputText = [];
+		inputs.forEach((e) => inputText.push(e.value));
+		get4Movies(inputText);
 
-        const countries = data.Country.split(", ");
-        //console.log(countries);
-        const promises = [];
-        for(let i = 0; i < countries.length; i++) {
-            promises.push(fetch(`https://restcountries.com/v2/name/${countries[i]}`));
-        }
-        //console.log(promises);
-        return Promise.all(promises)
-    })
-    .then(async(aa) => {
-        //console.log(aa);
-        for(let i = 0; i < aa.length; i++) {
-           const a = await aa[i].json();
-           //console.log(a);
-            renderPopulation(a);
-            container3Movies.style.display = "flex";
-        }
-    })
-    .catch(err => {
-        renderError(`Something went wrong for 1 ${err.message}. Try again!`);
-    })
-}
-
-
-btn3Movies.addEventListener("click", function() {
-    if(inputs[0].value !== "" && inputs[1].value !== "" && inputs[2].value !== "") {
-        warningDiv1.innerHTML = "";
-        warningDiv2.innerHTML = "";
-        inputs.forEach(el => get3Movies(el.value));
-
-        inputs.forEach(el => el.value = "");
-        movieLengthSum = 0;
-        populationSum = 0;
-    } else {
-        warningDiv2.innerHTML = `<p class="warning">Please fill all the inputs to approve your search!</p>`;
-    }
-    
+		inputs.forEach((el) => (el.value = ""));
+	} else {
+		warningDiv2.innerHTML = `<p class="warning">Please fill all the inputs to approve your search!</p>`;
+	}
 });
